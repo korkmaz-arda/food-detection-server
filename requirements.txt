@@ -1,3 +1,6 @@
 fastapi
 ultralytics
 argon2-cffi
+python-multipart
+uvicorn
+shapely
