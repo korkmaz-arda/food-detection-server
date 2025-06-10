@@ -3,4 +3,5 @@ ultralytics
 argon2-cffi
 python-multipart
 uvicorn
+uvicorn[standard]
 shapely
