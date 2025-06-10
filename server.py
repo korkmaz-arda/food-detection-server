@@ -280,6 +280,18 @@ async def models_admin_page():
     return FileResponse("models_admin.html")
 
 
+@app.get("/user")
+async def user_client_page():
+    """Serve the user client page"""
+    return FileResponse("user_client.html")
+
+
+@app.get("/dev")
+async def dev_client_page():
+    """Serve the developer client page"""
+    return FileResponse("dev_client.html")
+
+
 @app.get("/stats")
 async def get_stats():
     uptime = time.time() - stats["start_time"]
