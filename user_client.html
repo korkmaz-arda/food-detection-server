@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Food Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #0f0f0f;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .video-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(45deg, #00ff88, #00ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .connected {
+            background-color: #00ff8833;
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+        
+        .disconnected {
+            background-color: #ff444433;
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+        
+        .waiting {
+            background-color: #ffaa0033;
+            color: #ffaa00;
+            border: 1px solid #ffaa00;
+        }
+        
+        .video-container {
+            position: relative;
+            flex: 1;
+            background-color: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #00ff88, #00ccff);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.4);
+        }
+        
+        button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #checkoutBtn {
+            background: linear-gradient(45deg, #ff6b6b, #ff8787);
+        }
+        
+        input {
+            background-color: #1a1a1a;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #00ff88;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background-color: #1a1a1a;
+            border-left: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .sidebar h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #fff;
+            background: linear-gradient(45deg, #00ff88, #00ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .detection-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .detection-item {
+            background-color: #0f0f0f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .detection-item:hover {
+            border-color: #00ff88;
+            transform: translateX(5px);
+            background-color: rgba(0, 255, 136, 0.05);
+        }
+        
+        .item-name {
+            font-size: 18px;
+            font-weight: 600;
+            text-transform: capitalize;
+            color: #ffffff;
+        }
+        
+        .item-price {
+            font-size: 16px;
+            color: #00ff88;
+            font-weight: 500;
+        }
+        
+        .empty-message {
+            text-align: center;
+            color: #666;
+            padding: 40px 20px;
+            font-size: 16px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* Bounding box styles - only for food */
+        .bbox {
+            position: absolute;
+            border: 2px solid;
+            pointer-events: none;
+        }
+        
+        .bbox-food {
+            border-color: #00ff88;
+            background-color: rgba(0, 255, 136, 0.1);
+        }
+        
+        .bbox-label {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            white-space: nowrap;
+            background-color: #00ff88;
+            color: #000;
+        }
+        
+        /* Simple checkout page styles */
+        #checkoutPage {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0f0f0f;
+            z-index: 1000;
+            padding: 40px;
+            overflow-y: auto;
+        }
+        
+        .checkout-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .checkout-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .checkout-header h2 {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        
+        .checkout-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 16px;
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .checkout-total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 24px;
+            font-weight: 600;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #333;
+        }
+        
+        .checkout-buttons {
+            display: flex;
+            gap: 20px;
+            margin-top: 40px;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainPage">
+        <div class="video-section">
+            <div class="header">
+                <h1>Real-time Food Detection</h1>
+                <div class="status disconnected" id="status">Disconnected</div>
+            </div>
+            
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+                <div id="bboxContainer"></div>
+            </div>
+            
+            <div class="controls">
+                <button id="connectBtn" onclick="connect()">Connect</button>
+                <button id="startBtn" onclick="startStream()" disabled>Start Detection</button>
+                <button id="stopBtn" onclick="stopStream()" disabled>Stop</button>
+                <button id="switchBtn" onclick="switchCamera()" disabled>Switch Camera</button>
+                <button id="checkoutBtn" onclick="showCheckout()">Checkout</button>
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <h2>Detected Items</h2>
+            <div class="detection-list" id="detectionsList"></div>
+        </div>
+    </div>
+    
+    <!-- Simple Checkout Page -->
+    <div id="checkoutPage" class="hidden">
+        <div class="checkout-container">
+            <div class="checkout-header">
+                <h2>Checkout</h2>
+                <p>Review your order</p>
+            </div>
+            
+            <div id="checkoutItems">
+                <!-- Items will be populated here -->
+            </div>
+            
+            <div class="checkout-total">
+                <span>Total</span>
+                <span id="checkoutTotal">$0.00</span>
+            </div>
+            
+            <div class="checkout-buttons">
+                <button onclick="backToDetection()">Back to Detection</button>
+                <button onclick="confirmOrder()">Confirm Order</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let stream = null;
+        let intervalId = null;
+        let currentCameraIndex = 0;
+        let videoDevices = [];
+        let framesSent = 0;
+        let totalDetections = 0;
+        let lastDetectionResult = null;
+        let videoElement = null;
+        let canvasElement = null;
+        let bboxContainer = null;
+        
+        let detectedItems = new Map();
+        
+        let foodPrices = {
+            'banana': 1.99,
+            'apple': 1.49,
+            'sandwich': 7.99,
+            'orange': 1.79,
+            'broccoli': 2.99,
+            'carrot': 1.29,
+            'hot dog': 4.99,
+            'pizza': 3.99,
+            'donut': 2.49,
+            'cake': 5.99
+        };
+        let foodClasses = [];
+
+        window.addEventListener('load', () => {
+            videoElement = document.getElementById('video');
+            canvasElement = document.getElementById('canvas');
+            bboxContainer = document.getElementById('bboxContainer');
+        });
+
+        function updateStatus(status, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const url = `${protocol}//${host}/ws`;
+
+            updateStatus('Connecting...', 'waiting');
+
+            try {
+                ws = new WebSocket(url);
+                
+                ws.onopen = () => {
+                    updateStatus('Connected', 'connected');
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('startBtn').disabled = false;
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    handleServerMessage(data);
+                };
+
+                ws.onerror = (error) => {
+                    updateStatus('Connection Error', 'disconnected');
+                };
+
+                ws.onclose = () => {
+                    updateStatus('Disconnected', 'disconnected');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = true;
+                    stopStream();
+                };
+
+            } catch (error) {
+                updateStatus('Connection Failed', 'disconnected');
+            }
+        }
+
+        function handleServerMessage(data) {
+            switch (data.type) {
+                case 'status':
+                    if (!data.models_loaded) {
+                        alert('Models not loaded on server. Please contact administrator.');
+                    }
+                    if (data.model_config) {
+                        foodClasses = data.model_config.food_classes || [];
+                        foodPrices = data.model_config.food_prices || foodPrices;
+                    }
+                    break;
+                
+                case 'detection':
+                    processDetectionResult(data.data);
+                    break;
+                
+                case 'error':
+                    console.error(`Server error: ${data.message}`);
+                    break;
+                    
+                case 'model_changed':
+                    // Model changed on server, update config
+                    if (data.model_config) {
+                        foodClasses = data.model_config.food_classes || [];
+                        foodPrices = data.model_config.food_prices || foodPrices;
+                        // Clear current detections as they may not be valid
+                        detectedItems.clear();
+                    }
+                    break;
+            }
+        }
+
+        function processDetectionResult(result) {
+            lastDetectionResult = result;
+            framesSent++;
+            
+            if (result.method === 'yolo') {
+                detectedItems.clear();
+                result.foods.forEach(food => {
+                    if (food.in_tray) {
+                        const count = detectedItems.get(food.class) || 0;
+                        detectedItems.set(food.class, count + 1);
+                    }
+                });
+            }
+            
+            drawBoundingBoxes(result);
+            updateDetectionList(result);
+        }
+
+        function drawBoundingBoxes(result) {
+            bboxContainer.innerHTML = '';
+            
+            const videoRect = videoElement.getBoundingClientRect();
+            const scaleX = videoRect.width / 640;
+            const scaleY = videoRect.height / 480;
+            
+            result.foods.forEach(food => {
+                if (food.in_tray) {
+                    const box = createBoundingBox(food, scaleX, scaleY);
+                    bboxContainer.appendChild(box);
+                }
+            });
+        }
+
+        function createBoundingBox(detection, scaleX, scaleY) {
+            const [x1, y1, x2, y2] = detection.bbox;
+            
+            const box = document.createElement('div');
+            box.className = 'bbox bbox-food';
+            box.style.left = `${x1 * scaleX}px`;
+            box.style.top = `${y1 * scaleY}px`;
+            box.style.width = `${(x2 - x1) * scaleX}px`;
+            box.style.height = `${(y2 - y1) * scaleY}px`;
+            
+            const label = document.createElement('div');
+            label.className = 'bbox-label';
+            label.textContent = detection.class;
+            box.appendChild(label);
+            
+            return box;
+        }
+
+        function updateDetectionList(result) {
+            const listDiv = document.getElementById('detectionsList');
+            listDiv.innerHTML = '';
+            
+            const foodsInTrays = result.foods.filter(food => food.in_tray);
+            
+            if (foodsInTrays.length === 0) {
+                listDiv.innerHTML = '<div class="empty-message">No items detected</div>';
+                return;
+            }
+            
+            // Group by food type
+            const foodGroups = {};
+            foodsInTrays.forEach(food => {
+                if (!foodGroups[food.class]) {
+                    foodGroups[food.class] = 0;
+                }
+                foodGroups[food.class]++;
+            });
+            
+            // Display grouped items
+            Object.entries(foodGroups).forEach(([foodClass, count]) => {
+                const item = document.createElement('div');
+                item.className = 'detection-item';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'item-name';
+                nameDiv.textContent = count > 1 ? `${foodClass} (${count})` : foodClass;
+                
+                const priceDiv = document.createElement('div');
+                priceDiv.className = 'item-price';
+                const unitPrice = foodPrices[foodClass] || 0;
+                if (count > 1) {
+                    priceDiv.textContent = `${count} × ${unitPrice.toFixed(2)}`;
+                } else {
+                    priceDiv.textContent = `${unitPrice.toFixed(2)}`;
+                }
+                
+                item.appendChild(nameDiv);
+                item.appendChild(priceDiv);
+                
+                /* tray indicator - WHICH TRAY? - if multiple trays are on screen
+                if (food.in_tray) {
+                    const trayIndicator = document.createElement('span');
+                    trayIndicator.className = 'tray-indicator';
+                    trayIndicator.textContent = `In ${food.tray_id}`;
+                    item.appendChild(trayIndicator);
+                }
+                */
+                
+                listDiv.appendChild(item);
+            });
+        }
+
+        async function startStream() {
+            try {
+                // Get camera permissions and enumerate devices
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                videoDevices = devices.filter(device => device.kind === 'videoinput');
+                tempStream.getTracks().forEach(track => track.stop());
+                
+                if (videoDevices.length === 0) {
+                    throw new Error('No cameras found');
+                }
+                
+                currentCameraIndex = videoDevices.length > 1 ? 1 : 0;
+                
+                await useCamera(currentCameraIndex);
+                
+            } catch (error) {
+                alert('Failed to access webcam. Please ensure you have a camera and have granted permission.');
+            }
+        }
+
+        async function useCamera(index) {
+            try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                
+                const device = videoDevices[index];
+                
+                const constraints = { 
+                    video: { 
+                        deviceId: { exact: device.deviceId },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        frameRate: { ideal: 30 }
+                    } 
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = stream;
+                
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('switchBtn').disabled = videoDevices.length <= 1;
+                
+                // Update switch button text
+                if (videoDevices.length > 1) {
+                    const nextIndex = (currentCameraIndex + 1) % videoDevices.length;
+                    document.getElementById('switchBtn').textContent = `Switch Camera`;
+                }
+
+                if (!intervalId) {
+                    sendFrames();
+                }
+                
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        async function switchCamera() {
+            if (videoDevices.length <= 1) return;
+            
+            currentCameraIndex = (currentCameraIndex + 1) % videoDevices.length;
+            
+            await useCamera(currentCameraIndex);
+        }
+
+        function sendFrames() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 640;
+            canvas.height = 480;
+            
+            intervalId = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                    
+                    canvas.toBlob((blob) => {
+                        if (blob && ws.readyState === WebSocket.OPEN) {
+                            ws.send(blob);
+                        }
+                    }, 'image/jpeg', 0.75);
+                }
+            }, 50); // 20 FPS
+        }
+
+        function stopStream() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            videoElement.srcObject = null;
+            bboxContainer.innerHTML = '';
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('switchBtn').disabled = true;
+        }
+        
+        function showCheckout() {
+            // stop frame sending
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            
+            const itemsDiv = document.getElementById('checkoutItems');
+            itemsDiv.innerHTML = '';
+            let total = 0;
+            
+            if (detectedItems.size === 0) {
+                itemsDiv.innerHTML = '<p style="text-align: center; color: #666;">No items detected</p>';
+            } else {
+                detectedItems.forEach((count, foodType) => {
+                    const price = foodPrices[foodType] || 0;
+                    const itemTotal = price * count;
+                    total += itemTotal;
+                    
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'checkout-item';
+                    itemDiv.innerHTML = `
+                        <span>${foodType} ${count > 1 ? `(x${count})` : ''}</span>
+                        <span>$${itemTotal.toFixed(2)}</span>
+                    `;
+                    itemsDiv.appendChild(itemDiv);
+                });
+            }
+            
+            document.getElementById('checkoutTotal').textContent = `$${total.toFixed(2)}`;
+            
+            document.getElementById('mainPage').classList.add('hidden');
+            document.getElementById('checkoutPage').classList.remove('hidden');
+        }
+        
+        function backToDetection() {
+            document.getElementById('checkoutPage').classList.add('hidden');
+            document.getElementById('mainPage').classList.remove('hidden');
+            
+            if (ws && ws.readyState === WebSocket.OPEN && stream) {
+                sendFrames();
+            }
+        }
+        
+        function confirmOrder() {
+            alert('Order confirmed! (Demo only - no payment processed)');
+            detectedItems.clear();
+            backToDetection();
+        }
+
+        window.addEventListener('beforeunload', () => {
+            stopStream();
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+</body>
+</html>

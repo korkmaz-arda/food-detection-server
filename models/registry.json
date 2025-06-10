@@ -1,0 +1,6 @@
+{
+  "active": {
+    "tray": "tray_detector.pt",
+    "food": "yolo11n.pt"
+  }
+}
